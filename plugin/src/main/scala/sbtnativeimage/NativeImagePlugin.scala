@@ -1,6 +1,7 @@
 package sbtnativeimage
 
 import bleep._
+import bleep.logging.Logger
 import bloop.config.Config.Project
 
 import java.io.File
@@ -12,6 +13,7 @@ import scala.util.Properties
 
 class NativeImagePlugin(
     project: Project,
+    logger: Logger,
     // The version of GraalVM to use by default.
     nativeImageVersion: String = "20.2.0",
     // The GraalVM JVM version, one of: graalvm-java11 (default) | graalvm (Java 8)
@@ -160,12 +162,10 @@ class NativeImagePlugin(
     command += binaryName.toAbsolutePath.toString
 
     // Start native-image linker.
-    println(command.mkString(" "))
     val cwd = targetNativeImage
     Files.createDirectories(cwd)
-    val exit = Process(command, cwd = Some(cwd.toFile)).!
-    if (exit != 0) { throw new MessageOnlyException(s"native-image command failed with exit code '$exit'") }
-    println(s"Native image ready at ${binaryName.toAbsolutePath}!")
+    cli(command.mkString(" "))(cwd)
+    logger.withContext(binaryName).info("Native image ready")
     binaryName
   }
 
