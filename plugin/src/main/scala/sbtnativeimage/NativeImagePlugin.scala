@@ -29,7 +29,7 @@ class NativeImagePlugin(
   val targetNativeImage = target / "native-image"
 
   // The binary that is produced by native-image
-  def nativeImageOutput: Path = target / project.name
+  def nativeImageOutput: Path = targetNativeImage / project.name
 
   final class MessageOnlyException(override val toString: String) extends RuntimeException(toString)
 
