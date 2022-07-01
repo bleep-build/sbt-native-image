@@ -17,8 +17,6 @@ class NativeImagePlugin(
     project: Project,
     logger: Logger,
     nativeImageJvm: model.Jvm = model.Jvm.graalvm,
-    // The JVM version index to use, one of: cs (default) | jabba
-    nativeImageJvmIndex: String = "cs",
     // Extra command-line arguments that should be forwarded to the native-image optimizer.
     nativeImageOptions: Seq[String] = Nil,
     executionContext: ExecutionContext = ExecutionContext.global
