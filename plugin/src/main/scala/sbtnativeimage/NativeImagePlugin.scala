@@ -35,12 +35,12 @@ class NativeImagePlugin(
 
   // The command arguments to launch the GraalVM native-image binary
   lazy val nativeImageCommand: Path = {
+    def cmd(cmd: String) = if (Properties.isWin) s"$cmd.cmd" else cmd
     val javaCmd = JvmCmd(logger, Some(nativeImageJvm), executionContext)
-    val binary = if (Properties.isWin) "native-image.cmd" else "native-image"
-    val nativeImageCmd = javaCmd.resolveSibling(binary)
+    val nativeImageCmd = javaCmd.resolveSibling(cmd("native-image"))
     if (!FileUtils.exists(nativeImageCmd)) {
       import scala.sys.process._
-      List(javaCmd.resolveSibling("gu").toString, "install", "native-image").!!
+      List(javaCmd.resolveSibling(cmd("gu")).toString, "install", "native-image").!!
     }
     nativeImageCmd
   }
