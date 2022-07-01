@@ -1,6 +1,7 @@
 package sbtnativeimage
 
 import bleep._
+import bleep.internal.FileUtils
 import bleep.logging.Logger
 import bloop.config.Config.Project
 
@@ -8,20 +9,19 @@ import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.util.jar.{Attributes, JarOutputStream, Manifest}
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
 import scala.sys.process.Process
 import scala.util.Properties
 
 class NativeImagePlugin(
     project: Project,
     logger: Logger,
-    // The version of GraalVM to use by default.
-    nativeImageVersion: String = "20.2.0",
-    // The GraalVM JVM version, one of: graalvm-java11 (default) | graalvm (Java 8)
-    nativeImageJvm: String = "graalvm-java11",
+    nativeImageJvm: model.Jvm = model.Jvm.graalvm,
     // The JVM version index to use, one of: cs (default) | jabba
     nativeImageJvmIndex: String = "cs",
     // Extra command-line arguments that should be forwarded to the native-image optimizer.
-    nativeImageOptions: Seq[String] = Nil
+    nativeImageOptions: Seq[String] = Nil,
+    executionContext: ExecutionContext = ExecutionContext.global
 ) {
 
   val target = project.directory / "target"
@@ -33,71 +33,18 @@ class NativeImagePlugin(
 
   final class MessageOnlyException(override val toString: String) extends RuntimeException(toString)
 
-  // Path to a coursier binary that is used to launch GraalVM native-image.
-  def nativeImageCoursier(): Path = {
-    val dir = targetNativeImageInternal
-    val out = copyResource("coursier", dir)
-    if (Properties.isWin) {
-      copyResource("coursier.bat", dir)
-    } else {
-      out
-    }
-  }
-
-  // Whether GraalVM is manually installed or should be downloaded with coursier.
-  lazy val nativeImageInstalled: Boolean = {
-    "true".equalsIgnoreCase(System.getProperty("native-image-installed")) ||
-    "true".equalsIgnoreCase(System.getenv("NATIVE_IMAGE_INSTALLED")) ||
-    "true".equalsIgnoreCase(System.getProperty("graalvm-installed")) ||
-    "true".equalsIgnoreCase(System.getenv("GRAALVM_INSTALLED"))
-  }
-
-  // Path to GraalVM home directory.
-  lazy val nativeImageGraalHome: Path = {
-    if (nativeImageInstalled) {
-      Paths.get {
-        List("GRAAL_HOME", "GRAALVM_HOME", "JAVA_HOME").iterator
-          .map(key => Option(System.getenv(key)))
-          .collectFirst { case Some(value) => value }
-          .getOrElse("")
-      }
-    } else {
-      val coursier = nativeImageCoursier().toAbsolutePath.toString
-      val svm = nativeImageVersion
-      val jvm = nativeImageJvm
-      val index = nativeImageJvmIndex
-      Paths.get(Process(List(coursier, "java-home", "--jvm-index", index, "--jvm", s"$jvm:$svm")).!!.trim)
-    }
-  }
-
   // The command arguments to launch the GraalVM native-image binary
-  lazy val nativeImageCommand: Seq[String] = {
-    val graalHome = nativeImageGraalHome
-    if (nativeImageInstalled) {
-      val binary = if (Properties.isWin) "native-image.cmd" else "native-image"
-      val path = graalHome / "bin" / binary
-      List[String](path.toString)
-    } else {
-      val cmd =
-        if (Properties.isWin)
-          ".cmd"
-        else
-          ""
-      val ni = graalHome / "bin" / s"native-image$cmd"
-      if (!Files.isExecutable(ni)) {
-        val gu = ni.resolveSibling(s"gu$cmd")
-        Process(List(gu.toString, "install", "native-image")).!
-      }
-      if (!Files.isExecutable(ni)) {
-        throw new MessageOnlyException(
-          "Failed to automatically install native-image. " +
-            "To fix this problem, install native-image manually and start sbt with " +
-            "the environment variable 'NATIVE_IMAGE_INSTALLED=true'"
-        )
-      }
-      List(ni.toString)
+  lazy val nativeImageCommand: Path = {
+    val javaCmd = JvmCmd(logger, Some(nativeImageJvm), executionContext)
+    val binary = if (Properties.isWin) "native-image.cmd" else "native-image"
+    val nativeImageCmd = javaCmd.resolveSibling(binary)
+    if (!FileUtils.exists(nativeImageCmd)) {
+      import scala.sys.process._
+      List(javaCmd.resolveSibling("gu").toString, "install", "native-image").!!
     }
+    nativeImageCmd
   }
+
   //    // Run application, tracking all usages of dynamic features of an execution with `native-image-agent`.
   //    def nativeImageRunAgent: Unit = {
   //      val _ = nativeImageCommand
@@ -147,7 +94,7 @@ class NativeImagePlugin(
 
     // Assemble native-image argument list.
     val command = mutable.ListBuffer.empty[String]
-    command ++= nativeImageCommand
+    command += nativeImageCommand.toString
     command += "-cp"
     command += nativeClasspath
     command ++= nativeImageOptions
@@ -208,11 +155,12 @@ class NativeImagePlugin(
     // This needs to be declared since jos itself should be set to close as well.
     var jos: JarOutputStream = null
     try jos = new JarOutputStream(out, manifest)
-    finally if (jos == null) {
-      out.close()
-    } else {
-      jos.close()
-    }
+    finally
+      if (jos == null) {
+        out.close()
+      } else {
+        jos.close()
+      }
   }
 
   private def addTrailingSlashToDirectories(manifestJar: Path)(path: Path): String = {
@@ -224,9 +172,9 @@ class NativeImagePlugin(
         val dependencyPath = path
         try manifestPath.relativize(dependencyPath).toString
         catch {
-          //java.lang.IllegalArgumentException: 'other' has different root
-          //this happens if the dependency jar resides on a different drive then the manifest, i.e. C:\Coursier\Cache and D:\myapp\target
-          //copy dependency next to manifest as fallback
+          // java.lang.IllegalArgumentException: 'other' has different root
+          // this happens if the dependency jar resides on a different drive then the manifest, i.e. C:\Coursier\Cache and D:\myapp\target
+          // copy dependency next to manifest as fallback
           case _: IllegalArgumentException =>
             import java.nio.file.{Files, StandardCopyOption}
             Files.copy(
@@ -242,13 +190,12 @@ class NativeImagePlugin(
         path.toUri.getPath
       }
 
-    val separatorAdded = {
+    val separatorAdded =
       if (syntax.endsWith(".jar") || syntax.endsWith(File.separator)) {
         syntax
       } else {
         syntax + File.separator
       }
-    }
     separatorAdded
   }
 }
