@@ -6,7 +6,7 @@ import bleep.logging.Logger
 import bloop.config.Config.Project
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths, StandardCopyOption}
+import java.nio.file.{Files, Path}
 import java.util.jar.{Attributes, JarOutputStream, Manifest}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
@@ -128,21 +128,6 @@ class NativeImagePlugin(
     if (exit != 0) {
       throw new MessageOnlyException(s"non-zero exit: $exit")
     }
-  }
-
-  private def copyResource(filename: String, outDir: Path): Path = {
-    Files.createDirectories(outDir)
-    val in = this.getClass.getResourceAsStream(s"/sbt-native-image/${filename}")
-    if (in == null) {
-      throw new MessageOnlyException(
-        "unable to find coursier binary via resources. " +
-          "To fix this problem, define the `nativeImageCoursier` task to return the path to a Coursier binary."
-      )
-    }
-    val out = outDir / filename
-    Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING)
-    out.toFile.setExecutable(true)
-    out
   }
 
   private def createManifestJar(manifestJar: Path, cp: Seq[Path]): Unit = {
