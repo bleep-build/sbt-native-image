@@ -16,7 +16,7 @@ import scala.util.Properties
 class NativeImagePlugin(
     project: Project,
     logger: Logger,
-    nativeImageJvm: model.Jvm = model.Jvm.graalvm,
+    nativeImageJvm: model.Jvm,
     // Extra command-line arguments that should be forwarded to the native-image optimizer.
     nativeImageOptions: Seq[String] = Nil,
     executionContext: ExecutionContext = ExecutionContext.global
@@ -34,7 +34,7 @@ class NativeImagePlugin(
   // The command arguments to launch the GraalVM native-image binary
   lazy val nativeImageCommand: Path = {
     def cmd(cmd: String) = if (Properties.isWin) s"$cmd.cmd" else cmd
-    val javaCmd = FetchJvm(logger, Some(nativeImageJvm), executionContext)
+    val javaCmd = FetchJvm(logger, nativeImageJvm, executionContext)
     val nativeImageCmd = javaCmd.resolveSibling(cmd("native-image"))
     if (!FileUtils.exists(nativeImageCmd)) {
       import scala.sys.process._
@@ -109,7 +109,7 @@ class NativeImagePlugin(
     // Start native-image linker.
     val cwd = targetNativeImage
     Files.createDirectories(cwd)
-    cli(command.mkString(" "), logger)(cwd)
+    cli(command.toList, logger, "ni")(cwd)
     logger.withContext(binaryName).info("Native image ready")
     binaryName
   }
