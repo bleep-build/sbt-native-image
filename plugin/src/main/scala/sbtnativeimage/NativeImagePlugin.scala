@@ -19,7 +19,8 @@ class NativeImagePlugin(
     nativeImageJvm: model.Jvm,
     // Extra command-line arguments that should be forwarded to the native-image optimizer.
     nativeImageOptions: Seq[String] = Nil,
-    executionContext: ExecutionContext = ExecutionContext.global
+    executionContext: ExecutionContext = ExecutionContext.global,
+    env: List[(String, String)] = Nil
 ) {
 
   val target = project.directory / "target"
@@ -110,7 +111,7 @@ class NativeImagePlugin(
     // Start native-image linker.
     val cwd = targetNativeImage
     Files.createDirectories(cwd)
-    cli(action = "ni", cwd = cwd, cmd = command.toList, logger = logger)
+    cli(action = "ni", cwd = cwd, cmd = command.toList, logger = logger, env = env)
     logger.withContext(binaryName).info("Native image ready")
     binaryName
   }
