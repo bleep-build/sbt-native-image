@@ -23,7 +23,7 @@ class NativeImagePlugin(
     env: List[(String, String)] = Nil
 ) {
 
-  val target = project.directory / "target"
+  val target = project.out / "target"
   val targetNativeImageInternal = target / "native-image-internal"
   val targetNativeImage = target / "native-image"
 
