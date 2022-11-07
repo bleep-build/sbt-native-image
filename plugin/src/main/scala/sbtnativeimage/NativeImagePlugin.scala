@@ -1,4 +1,4 @@
-package sbtnativeimage
+package bleep.plugin.nativeimage
 
 import bleep._
 import bleep.internal.FileUtils
