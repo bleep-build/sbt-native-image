@@ -111,7 +111,7 @@ class NativeImagePlugin(
     // Start native-image linker.
     val cwd = targetNativeImage
     Files.createDirectories(cwd)
-    cli(action = "ni", cwd = cwd, cmd = command.toList, cliLogger = cli.CliLogger(logger), env = env)
+    cli(action = "ni", cwd = cwd, cmd = command.toList, logger = logger, out = cli.Out.ViaLogger(logger), env = env)
     logger.withContext(binaryName).info("Native image ready")
     binaryName
   }
