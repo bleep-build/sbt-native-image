@@ -9,17 +9,15 @@ import java.io.File
 import java.nio.file.{Files, Path}
 import java.util.jar.{Attributes, JarOutputStream, Manifest}
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
 import scala.sys.process.Process
 import scala.util.Properties
 
 class NativeImagePlugin(
     project: Project,
     logger: Logger,
-    nativeImageJvm: model.Jvm,
+    jvmCommand: Path,
     // Extra command-line arguments that should be forwarded to the native-image optimizer.
     nativeImageOptions: Seq[String] = Nil,
-    executionContext: ExecutionContext = ExecutionContext.global,
     env: List[(String, String)] = Nil
 ) {
 
@@ -35,12 +33,11 @@ class NativeImagePlugin(
   // The command arguments to launch the GraalVM native-image binary
   lazy val nativeImageCommand: Path = {
     def cmd(cmd: String) = if (Properties.isWin) s"$cmd.cmd" else cmd
-    val javaCmd = FetchJvm(new BleepCacheLogger(logger), nativeImageJvm, executionContext)
 
-    val nativeImageCmd = javaCmd.resolveSibling(cmd("native-image"))
+    val nativeImageCmd = jvmCommand.resolveSibling(cmd("native-image"))
     if (!FileUtils.exists(nativeImageCmd)) {
       import scala.sys.process._
-      List(javaCmd.resolveSibling(cmd("gu")).toString, "install", "native-image").!!
+      List(jvmCommand.resolveSibling(cmd("gu")).toString, "install", "native-image").!!
     }
     nativeImageCmd
   }
