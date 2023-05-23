@@ -1,9 +1,10 @@
 package bleep.plugin.nativeimage
 
-import bleep._
+import bleep.*
 import bleep.internal.FileUtils
 import bleep.logging.Logger
 import bloop.config.Config.Project
+import sbtnativeimage.graal.{BytecodeProcessor, TempCache}
 
 import java.io.File
 import java.nio.file.{Files, Path}
@@ -71,12 +72,21 @@ class NativeImagePlugin(
   // See https://www.graalvm.org/reference-manual/native-image/BuildConfiguration/#assisted-configuration-of-native-image-builds for details
   def nativeImageAgentMerge: Boolean = false
 
+  def fixScala3(paths: Seq[Path]): Seq[Path] = {
+    val scala3RuntimeFixes = getClass.getResource("/scala3RuntimeFixes.jar") match {
+      case null => throw new Exception("scala3RuntimeFixes.jar not found")
+      case found => Path.of(found.toURI.getPath)
+    }
+    val withScala3RuntimeFixes = scala3RuntimeFixes +: paths
+    BytecodeProcessor.processClassPathEntries(withScala3RuntimeFixes.map(os.Path(_)), TempCache).map(_.nioPath)
+  }
+
   // Generate a native image for this project.
   def nativeImage(): Path = {
     val main = project.platform.flatMap(_.mainClass)
     val binaryName = nativeImageOutput
 
-    val cp = fixedClasspath(project)
+    val cp = fixScala3(fixedClasspath(project))
 
     // NOTE(olafur): we pass in a manifest jar instead of the full classpath
     // for two reasons:
