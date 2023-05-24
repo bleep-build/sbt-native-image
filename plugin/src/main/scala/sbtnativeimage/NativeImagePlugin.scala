@@ -37,7 +37,7 @@ class NativeImagePlugin(
 
     val nativeImageCmd = jvmCommand.resolveSibling(cmd("native-image"))
     if (!FileUtils.exists(nativeImageCmd)) {
-      import scala.sys.process._
+      import scala.sys.process.*
       List(jvmCommand.resolveSibling(cmd("gu")).toString, "install", "native-image").!!
     }
     nativeImageCmd
@@ -72,13 +72,18 @@ class NativeImagePlugin(
   // See https://www.graalvm.org/reference-manual/native-image/BuildConfiguration/#assisted-configuration-of-native-image-builds for details
   def nativeImageAgentMerge: Boolean = false
 
-  def fixScala3(paths: Seq[Path]): Seq[Path] = {
-    val scala3RuntimeFixes = getClass.getResource("/scala3RuntimeFixes.jar") match {
+  // this is a jar file which needs to be available at graalvm link time after applying the transformations for scala 3
+  lazy val scala3RuntimeFixesJar: os.Path = {
+    val bytes = getClass.getResourceAsStream("/scala3RuntimeFixes.jar") match {
       case null => throw new Exception("scala3RuntimeFixes.jar not found")
-      case found => Path.of(found.toURI.getPath)
+      case is => is
     }
-    val withScala3RuntimeFixes = scala3RuntimeFixes +: paths
-    BytecodeProcessor.processClassPathEntries(withScala3RuntimeFixes.map(os.Path(_)), TempCache).map(_.nioPath)
+    os.temp(bytes, suffix = ".jar", deleteOnExit = true)
+  }
+
+  def fixScala3(paths: Seq[Path]): Seq[Path] = {
+    val withScala3RuntimeFixes = scala3RuntimeFixesJar +: paths.map(os.Path(_))
+    BytecodeProcessor.processClassPathEntries(withScala3RuntimeFixes, TempCache).map(_.nioPath)
   }
 
   // Generate a native image for this project.
