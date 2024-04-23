@@ -39,6 +39,7 @@ class NativeImagePlugin(
     if (!FileUtils.exists(nativeImageCmd)) {
       import scala.sys.process.*
       List(jvmCommand.resolveSibling(cmd("gu")).toString, "install", "native-image").!!
+      ()
     }
     nativeImageCmd
   }
