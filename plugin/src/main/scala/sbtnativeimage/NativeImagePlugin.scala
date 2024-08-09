@@ -3,6 +3,7 @@ package bleep.plugin.nativeimage
 import bleep.*
 import bleep.internal.FileUtils
 import bleep.logging.Logger
+
 import bloop.config.Config.Project
 import sbtnativeimage.graal.{BytecodeProcessor, TempCache}
 
@@ -38,8 +39,7 @@ class NativeImagePlugin(
     val nativeImageCmd = jvmCommand.resolveSibling(cmd("native-image"))
     if (!FileUtils.exists(nativeImageCmd)) {
       import scala.sys.process.*
-      List(jvmCommand.resolveSibling(cmd("gu")).toString, "install", "native-image").!!
-      ()
+      List(jvmCommand.resolveSibling(cmd("gu")).toString, "install", "native-image").!!.discard()
     }
     nativeImageCmd
   }
@@ -124,7 +124,7 @@ class NativeImagePlugin(
     // Start native-image linker.
     val cwd = targetNativeImage
     Files.createDirectories(cwd)
-    cli(action = "ni", cwd = cwd, cmd = command.toList, logger = logger, out = cli.Out.ViaLogger(logger), env = env)
+    cli(action = "ni", cwd = cwd, cmd = command.toList, logger = logger, out = cli.Out.ViaLogger(logger), env = env).discard()
     logger.withContext(binaryName).info("Native image ready")
     binaryName
   }
