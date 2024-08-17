@@ -40,7 +40,6 @@ object BytecodeProcessor {
           manifest.getMainAttributes().put(Attributes.Name.CLASS_PATH, stringCp)
           val outjar = new JarOutputStream(outStream, manifest)
           outjar.close()
-          dest.toNIO.toString()
           Seq(PathingJar(Processed(dest, pathingJar, TempCache), processedCp))
         }
         finally outStream.close()
