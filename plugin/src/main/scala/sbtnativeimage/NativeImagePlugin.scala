@@ -3,7 +3,6 @@ package bleep.plugin.nativeimage
 import bleep.*
 import bleep.internal.FileUtils
 import bleep.logging.Logger
-
 import bloop.config.Config.Project
 import sbtnativeimage.graal.{BytecodeProcessor, TempCache}
 
