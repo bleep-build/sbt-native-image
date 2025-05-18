@@ -91,7 +91,7 @@ class NativeImagePlugin(
     val main = project.platform.flatMap(_.mainClass)
     val binaryName = nativeImageOutput
 
-    val cp = fixScala3(fixedClasspath(project))
+    val cp = fixScala3(fixedClasspath(project, true))
 
     // NOTE(olafur): we pass in a manifest jar instead of the full classpath
     // for two reasons:
