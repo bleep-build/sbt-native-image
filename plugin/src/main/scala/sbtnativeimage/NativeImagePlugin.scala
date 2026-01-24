@@ -2,7 +2,6 @@ package bleep.plugin.nativeimage
 
 import bleep.*
 import bleep.internal.FileUtils
-import bloop.config.Config.Project
 import ryddig.Logger
 import sbtnativeimage.graal.{BytecodeProcessor, TempCache}
 
@@ -14,7 +13,7 @@ import scala.sys.process.Process
 import scala.util.Properties
 
 class NativeImagePlugin(
-    project: Project,
+    project: ResolvedProject,
     logger: Logger,
     jvmCommand: Path,
     // Extra command-line arguments that should be forwarded to the native-image optimizer.
@@ -22,7 +21,7 @@ class NativeImagePlugin(
     env: List[(String, String)] = Nil
 ) {
 
-  val target = project.out / "target"
+  val target = project.directory / "target"
   val targetNativeImageInternal = target / "native-image-internal"
   val targetNativeImage = target / "native-image"
 
@@ -88,10 +87,14 @@ class NativeImagePlugin(
 
   // Generate a native image for this project.
   def nativeImage(): Path = {
-    val main = project.platform.flatMap(_.mainClass)
+    val main = project.platform.flatMap {
+      case jvm: ResolvedProject.Platform.Jvm       => jvm.mainClass
+      case js: ResolvedProject.Platform.Js         => js.mainClass
+      case native: ResolvedProject.Platform.Native => native.mainClass
+    }
     val binaryName = nativeImageOutput
 
-    val cp = fixScala3(fixedClasspath(project, true))
+    val cp = fixScala3(fixedClasspath(project))
 
     // NOTE(olafur): we pass in a manifest jar instead of the full classpath
     // for two reasons:
