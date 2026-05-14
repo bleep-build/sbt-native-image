@@ -2,8 +2,8 @@ package sbtnativeimage.graal
 
 case class CoursierCache(root: os.Path) extends JarCache {
   val hasher: os.Path => String = p => os.size(p).toString() // replace with proper md5 based caches
-  val prefix                    = "v2"
-  val cache                     = root / ".graal_processor"
+  val prefix = "v2"
+  val cache = root / ".graal_processor"
 
   override def put(entry: os.RelPath, content: Array[Byte]): ClassPathEntry = {
     // TODO better hashing
@@ -21,8 +21,8 @@ case class CoursierCache(root: os.Path) extends JarCache {
     if (!path.startsWith(root) || os.isDir(path)) ignore
     else {
       val relPath = path.relativeTo(root)
-      val name    = s"${path.baseName}_${hasher(path)}_$prefix.${path.ext}"
-      val dest    = cache / relPath / os.up / name
+      val name = s"${path.baseName}_${hasher(path)}_$prefix.${path.ext}"
+      val dest = cache / relPath / os.up / name
       if (os.exists(dest)) Processed(dest, path, this)
       else processPath(dest)
     }

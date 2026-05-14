@@ -75,7 +75,7 @@ class NativeImagePlugin(
   lazy val scala3RuntimeFixesJar: os.Path = {
     val bytes = getClass.getResourceAsStream("/scala3RuntimeFixes.jar") match {
       case null => throw new Exception("scala3RuntimeFixes.jar not found")
-      case is => is
+      case is   => is
     }
     os.temp(bytes, suffix = ".jar", deleteOnExit = true)
   }

@@ -32,8 +32,8 @@ object BytecodeProcessor {
           os.Path(rawEntry, os.pwd)
         }
         val processedCp = processClassPathEntries(entries, cache)
-        val dest        = os.temp(suffix = ".jar")
-        val outStream   = Files.newOutputStream(dest.toNIO, StandardOpenOption.CREATE)
+        val dest = os.temp(suffix = ".jar")
+        val outStream = Files.newOutputStream(dest.toNIO, StandardOpenOption.CREATE)
         try {
           val stringCp = processedCp.map(_.path.toNIO).mkString(" ")
           val manifest = new Manifest(jarFile.getManifest())
@@ -41,12 +41,9 @@ object BytecodeProcessor {
           val outjar = new JarOutputStream(outStream, manifest)
           outjar.close()
           Seq(PathingJar(Processed(dest, pathingJar, TempCache), processedCp))
-        }
-        finally outStream.close()
-      }
-      else processClassPathEntries(Seq(pathingJar), cache)
-    }
-    finally jarFile.close()
+        } finally outStream.close()
+      } else processClassPathEntries(Seq(pathingJar), cache)
+    } finally jarFile.close()
   }
 
   def processClassPath(classPath: String, cache: JarCache = TempCache): Seq[ClassPathEntry] =
@@ -70,15 +67,15 @@ object BytecodeProcessor {
       // jar with runtime deps is added as a resource
       // scala3RuntimeFixes.jar is also used within
       // resource-config.json and BytecodeProcessor.scala
-      val jarName      = "scala3RuntimeFixes.jar"
+      val jarName = "scala3RuntimeFixes.jar"
       val runtimeJarIs = getClass().getClassLoader.getResourceAsStream(jarName)
-      if (runtimeJarIs == null) throw new NoSuchElementException(
-        "Unable to find scala3RuntimeFixes.jar on classpath, did you add scala3-graal jar on classpath?"
-      )
+      if (runtimeJarIs == null)
+        throw new NoSuchElementException(
+          "Unable to find scala3RuntimeFixes.jar on classpath, did you add scala3-graal jar on classpath?"
+        )
       val created = cache.put(os.RelPath(jarName), runtimeJarIs.readAllBytes())
       created +: cp
-    }
-    else cp // No need to add processed jar
+    } else cp // No need to add processed jar
   }
 
   def processDir(dir: os.Path, dest: os.Path, cache: JarCache): ClassPathEntry = {
@@ -92,7 +89,7 @@ object BytecodeProcessor {
         val original = os.read.bytes(clazzFile)
         processClassFile(original) match {
           case Some(content) =>
-            val relPath  = clazzFile.relativeTo(dir)
+            val relPath = clazzFile.relativeTo(dir)
             val destPath = dest / relPath
             os.makeDir.all(destPath / os.up)
             assert(content != original)
@@ -103,20 +100,17 @@ object BytecodeProcessor {
         }
     }
     if (processed.result().nonEmpty) {
-      skipped.result().foreach(file =>
-        os.copy.over(file, dest / (file.relativeTo(dir)), createFolders = true)
-      )
+      skipped.result().foreach(file => os.copy.over(file, dest / (file.relativeTo(dir)), createFolders = true))
       Processed(dest, dir, cache)
-    }
-    else Unmodified(dir)
+    } else Unmodified(dir)
   }
 
   def processJar(path: os.Path, dest: os.Path, cache: JarCache): ClassPathEntry = {
     val jarFile = new JarFile(path.toIO)
     try {
       var processedBytecode: Option[Array[Byte]] = None
-      val endMarker                              = "///" // not a valid path
-      var processed: String                      = endMarker
+      val endMarker = "///" // not a valid path
+      var processed: String = endMarker
       def processEntry(entry: JarEntry) = {
         val newBytecode = processClassFile(jarFile.getInputStream(entry))
         processed = entry.getName()
@@ -132,10 +126,10 @@ object BytecodeProcessor {
       else {
         os.makeDir.all(dest / os.up)
         val outStream = Files.newOutputStream(dest.toNIO, StandardOpenOption.CREATE)
-        val outjar    = new JarOutputStream(outStream)
+        val outjar = new JarOutputStream(outStream)
         jarFile.entries().asIterator().asScala.foreach { entry =>
           val content: Array[Byte] = jarFile.getInputStream(entry).readAllBytes()
-          val name                 = entry.getName()
+          val name = entry.getName()
           val destBytes =
             if (cachedEntries.contains(name) || !name.endsWith(".class")) content
             else if (name == processed) processedBytecode.get
@@ -150,14 +144,13 @@ object BytecodeProcessor {
         outjar.close()
         Processed(dest, path, cache)
       }
-    }
-    finally jarFile.close()
+    } finally jarFile.close()
   }
 
   def processClassReader(reader: ClassReader): Option[Array[Byte]] = {
-    val writer  = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
+    val writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
     val visitor = new LazyValVisitor(writer)
-    val res     = util.Try(reader.accept(visitor, 0))
+    val res = util.Try(reader.accept(visitor, 0))
     if (visitor.changed && res.isSuccess) Some(writer.toByteArray) else None
   }
 
@@ -174,15 +167,14 @@ object BytecodeProcessor {
 
     var changed: Boolean = false
 
-    class StaticInitVistor(parent: MethodVisitor)
-        extends MethodVisitor(Opcodes.ASM9, parent) {
+    class StaticInitVistor(parent: MethodVisitor) extends MethodVisitor(Opcodes.ASM9, parent) {
 
       override def visitMethodInsn(
-        opcode: Int,
-        owner: String,
-        name: String,
-        descr: String,
-        isInterface: Boolean
+          opcode: Int,
+          owner: String,
+          name: String,
+          descr: String,
+          isInterface: Boolean
       ): Unit =
         if (owner == "scala/runtime/LazyVals$" && name == "getOffset") {
           changed = true
@@ -200,17 +192,16 @@ object BytecodeProcessor {
             "(Ljava/lang/Object;Ljava/lang/reflect/Field;)J",
             false
           )
-        }
-        else
+        } else
           super.visitMethodInsn(opcode, owner, name, descr, isInterface)
     }
 
     override def visitMethod(
-      access: Int,
-      name: String,
-      desc: String,
-      sig: String,
-      exceptions: Array[String]
+        access: Int,
+        name: String,
+        desc: String,
+        sig: String,
+        exceptions: Array[String]
     ): MethodVisitor =
       if (name == "<clinit>")
         new StaticInitVistor(super.visitMethod(access, name, desc, sig, exceptions))
