@@ -60,7 +60,13 @@ object BytecodeProcessor {
       cache.cache(path) { dest =>
         if (path.ext == "jar" && os.isFile(path)) processJar(path, dest, cache)
         else if (os.isDir(path)) processDir(path, dest, cache)
-        else Unmodified(dest)
+        // Nothing to rewrite: keep the ENTRY, not `dest`. `dest` is a freshly created, empty temp
+        // file/dir that has never been written to, so returning it silently swaps the classpath
+        // entry for an empty one. Harmless when `path` doesn't exist, but it also catches real
+        // content — a classpath entry that is a file whose name doesn't end in `.jar` (a `.zip`,
+        // an extensionless jar) would be dropped and the failure surfaces much later as a
+        // missing class.
+        else Unmodified(path)
       }
     }
     if (cp.exists(_.modified)) {
